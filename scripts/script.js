@@ -1,11 +1,12 @@
-'use strict';
 
-// Базовые переменные
-
+const subheaderCart = document.querySelector('.subheader__cart'),
+    cartOverlay = document.querySelector('.cart-overlay'),
+    cartListGoods = document.querySelector('.cart__list-goods'),
+    cartTotalCost = document.querySelector('.cart__total-cost');
+// Переменная определения хеша страницы с товарами
 let hash = location.hash.substring(1);
 
 // Вибор города через метод Promt и сохранение его в локальном хранилище
-
 const headerCityButton = document.querySelector('.header__city-button');
 
 headerCityButton.textContent = localStorage.getItem('lomoda-location') || 'Ваш город?';
@@ -15,6 +16,12 @@ headerCityButton.addEventListener('click', () => {
     headerCityButton.textContent = city;
     localStorage.setItem('lomoda-location', city);
 });
+
+// Работа с локальным хранилищем 
+const getLocalStorage = () => JSON?.parse(localStorage.getItem('cart-lomoda')) || [];
+const setLocalStorage = data => localStorage.setItem('cart-lomoda', JSON.stringify(data));
+
+
 
 // Блокировка скролла
 
@@ -39,14 +46,51 @@ const enableScroll = () => {
     });
 };
 
-// Подключение модального окна
+//Рендер корзины
+const renderCart = () => {
+    cartListGoods.textContent = '';
 
-const subheaderCart = document.querySelector('.subheader__cart'),
-    cartOverlay = document.querySelector('.cart-overlay');
+    const cartItems = getLocalStorage();
+    
+    let totalaPrice = 0;
+
+    cartItems.forEach((item, i) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+            `
+            <td>${i + 1}</td>
+            <td>${item.brand} ${item.name}</td>
+            ${item.color ? `<td>${item.color}</td>` : `<td>-</td>`}
+            ${item.size ? `<td>${item.size}</td>` : `<td>-</td>`}
+            <td>${item.cost} &#8381;</td>
+            <td><button class="btn-delete" data-id="${item.id}">&times;</button></td>
+        `;
+        totalaPrice += item.cost;
+        cartListGoods.append(tr);
+    });
+    cartTotalCost.textContent = totalaPrice + ` ₽`;
+};
+
+//Удаление с корзины
+
+const deleteItemCart = id => {
+    const cartItems = getLocalStorage();
+    const newCartItems = cartItems.filter(item => item.id !== id);
+    setLocalStorage(newCartItems);
+};
+cartListGoods.addEventListener('click', e => {
+    if (e.target.matches('.btn-delete')) {
+        deleteItemCart(e.target.dataset.id);
+        renderCart();
+    }
+});
+
+// Подключение модального окна
 
 const cartModalOpen = () => {
     cartOverlay.classList.add('cart-overlay-open');
     disableScroll();
+    renderCart();
 };
 
 const cartModalClose = () => {
@@ -176,7 +220,9 @@ try {
     const generateList = data => data.reduce((html, item, i) =>
         html + `<li class="card-good__select-item" data-id="${i}">${item}</li>`, '');
     
-    const renderCardGood = ([{ brand, name, cost, color, sizes, photo}]) => {
+    const renderCardGood = ([{ id, brand, name, cost, color, sizes, photo }]) => {
+        const data = { brand, name, cost, id };
+
         cardGoodImage.src = `goods-image/${photo}`;
         cardGoodImage.alt = `${brand} ${name}`;
         cardGoodBrand.textContent = brand;
@@ -197,6 +243,29 @@ try {
         } else {
             cardGoodSizes.style.display = 'none';
         }
+
+        if (getLocalStorage().some(item => item.id === id)) {
+            cardGoodBuy.classList.add('delete');
+            cardGoodBuy.textContent = 'Удалить из корзины';
+        }
+
+        cardGoodBuy.addEventListener('click', () => {
+            if (cardGoodBuy.classList.contains('delete')) {
+                deleteItemCart(id);
+                cardGoodBuy.classList.remove('delete');
+                cardGoodBuy.textContent = 'Добавить в корзину';
+                return;
+            }
+            if (color) { data.color = cardGoodColor.textContent; }
+            if (sizes) { data.size = cardGoodSizes.textContent; }
+
+            cardGoodBuy.classList.add('delete');
+            cardGoodBuy.textContent = 'Удалить из корзины';
+
+            const cardData = getLocalStorage();
+            cardData.push(data);
+            setLocalStorage(cardData);
+        });
     };
 
     cardGoodSelectWrapper.forEach(item => {
